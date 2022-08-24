@@ -1,0 +1,101 @@
+---
+title: "Oliver Twist"
+author: "Adejumo Ridwan Suleiman"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+## Project Gutenberg
+
+
+## libraries 
+```{r}
+library(tidyverse)
+library(dplyr) #data manipulation
+library(purrr) #functional programming
+library(tidytext) #text mining
+library(gutenbergr) #project gutenberg package
+library(ggplot2) #data visualization
+```
+
+# Load the novel Oliver Twist
+```{r}
+# Check for book id
+gutenberg_metadata %>% 
+  filter(title == "Oliver Twist")
+
+# create book data
+oliver_twist <- gutenberg_download(730)
+```
+
+
+# Unnest token and stopword removal
+- Tokens are sentences broken into words
+- Stop words are commonly used words
+
+```{r}
+tidy_oliver_twist <- oliver_twist %>% 
+  unnest_tokens(word, text) %>% 
+  anti_join(stop_words)
+
+tidy_oliver_twist
+```
+
+# Word Frequency
+```{r}
+tidy_oliver_twist %>% 
+  count(word, sort = TRUE)
+```
+
+# Word Frequency visualization
+```{r}
+tidy_oliver_twist %>% 
+  count(word, sort = TRUE) %>% 
+  filter(n > 200) %>%
+  top_n(10) %>% 
+  ggplot(aes(reorder(word, n),n,fill = word)) +
+  geom_col() +
+  coord_flip() +
+  labs(y = NULL, x = "word", title = "The Most Common Words in Oliver Twist")
+```
+
+# Sentiment Analysis(using bing)
+- This is the analysing of the sentiment of a particular text 
+- We have 3 general purpose lexicons that classify words into various sentiment
+  * AFINN - uses a numerical range of -5 t0 +5 with negative scores indicating negative sentiment and positive scores indicating positive sentiment.
+  * bing - classifies words into positive and negative
+  * nrc - classifies into positive, negative, anger, anticipation, disgust, fear, joy, sadness, surprise and trust.
+  
+- Bing categorizes words into negative and positive categories
+```{r}
+bing_word_counts <- tidy_oliver_twist %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, sort = TRUE) 
+
+bing_word_counts
+```
+
+# Most common postive and negative words
+```{r}
+bing_word_counts %>%
+  group_by(sentiment) %>% 
+  slice_max(n, n = 10) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = n, y = reorder(word, n), fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(x = "Contribution to sentiment",
+       y = NULL)
+```
+
+# Word Cloud (most common negative and positive words)
+In other functions, such as wordcloud::comparison.cloud(), you may need to turn the data frame into a matrix with reshape2’s acast().
+```{r}
+library(wordcloud)
+
+bing_word_counts %>%
+  reshape2::acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+  comparison.cloud(colors = c("red", "blue"),
+                   max.words = 50)
+```
+
